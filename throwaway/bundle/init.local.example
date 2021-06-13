@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+if [ -r /_throwaway_config/ssh/passwords ]; then
+	chpasswd -e < /_throwaway_config/ssh/passwords
+fi

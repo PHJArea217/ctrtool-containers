@@ -1,0 +1,9 @@
+{
+	"uid_start": 66000,
+	"gid_start": 66000,
+	"userns_owner_uid": 120,
+	"pdisk_path": "/disk/throwaway-rw_test_1",
+	"mac_address": "08:00:27:f0:00:01",
+	"username": "daniel",
+	"config_bundle": "/disk/test-bundle.tar.gz"
+}
