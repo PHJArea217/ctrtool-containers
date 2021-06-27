@@ -74,7 +74,7 @@ case "$7" in
 esac
 umask 077
 :>"$1"
-mount --bind /proc/self/ns/net -- "$1"' "$_NETNS_NAME" "$_LOCAL_NAME" "$_ADDRESSES" "$_DO_ACCEPT_RA" "$_MACADDR" "$_IPV4_GW" "$_IPV6_GW"
+mount --bind /proc/self/ns/net -- "$1"' - "$_NETNS_NAME" "$_LOCAL_NAME" "$_ADDRESSES" "$_DO_ACCEPT_RA" "$_MACADDR" "$_IPV4_GW" "$_IPV6_GW"
 
 case "$_MACADDR_LOCAL" in
 	*:*)
@@ -110,7 +110,7 @@ ip link set eth0 address 00:00:5e:00:53:40 up
 
 umask 077
 :>"$1"
-mount --bind /proc/self/ns/net -- "$1"' "$_NETNS_NAME" "$_LOCAL_NAME" "$_ADDRESSES" "$_ROUTES_NULL" "$_ROUTES_ERR" "$_ROUTES_LOCAL"
+mount --bind /proc/self/ns/net -- "$1"' - "$_NETNS_NAME" "$_LOCAL_NAME" "$_ADDRESSES" "$_ROUTES_NULL" "$_ROUTES_ERR" "$_ROUTES_LOCAL"
 for _addr in $_IPV4_DUMMY; do
 	ip addr add "$_addr" dev "$_LOCAL_NAME"
 done
