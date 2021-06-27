@@ -48,7 +48,7 @@ do_l2_system() {
 	fi
 	unshare -n sh 3</proc/self/ns/net -c 'set -euC
 if [ "0" = "$4" ]; then
-	sysctl -w net.ipv6.conf.all.accept_ra=0 net.ipv6.conf.default.accept_ra=0
+	sysctl -q -w net.ipv6.conf.all.accept_ra=0 net.ipv6.conf.default.accept_ra=0
 fi
 ip link set lo up
 ip link add name eth0 type veth peer name "$2" netns /proc/self/fd/3
@@ -92,7 +92,7 @@ do_l3_system() {
 		die "Need a local interface name"
 	fi
 	unshare -n sh 3</proc/self/ns/net -c 'set -euC
-sysctl -w net.ipv6.conf.all.accept_ra=0 net.ipv6.conf.default.accept_ra=0
+sysctl -q -w net.ipv6.conf.all.accept_ra=0 net.ipv6.conf.default.accept_ra=0
 ip link set lo up
 for _route in $4; do
 	ip route add blackhole "$_route"
