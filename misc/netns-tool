@@ -28,6 +28,7 @@ fix_netns_name () {
 			;;
 		*)
 			_NETNS_NAME="/run/netns/$_NETNS_NAME"
+			mkdir -p /run/netns
 			;;
 	esac
 }
