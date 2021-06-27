@@ -1,0 +1,193 @@
+#!/bin/sh
+
+set -eu
+
+_ROUTES_NULL=
+_ROUTES_ERR=
+_ROUTES_LOCAL=
+_ADDRESSES=
+_MACADDR=
+_MACADDR_LOCAL=
+_BRIDGE=
+_NETNS_NAME=
+_LOCAL_NAME=
+_IPV4_GW=
+_IPV6_GW=
+_IPV4_DUMMY=
+_DO_ACCEPT_RA=0
+IFS='
+ '
+export IFS
+die() {
+	printf '%s\n' "$*" >&2
+	exit 1
+}
+fix_netns_name () {
+	case "$_NETNS_NAME" in
+		*/*)
+			;;
+		*)
+			_NETNS_NAME="/run/netns/$_NETNS_NAME"
+			;;
+	esac
+}
+check_bridge() {
+	if [ "" = "$_BRIDGE" ]; then
+		die "bridge= not defined"
+	fi
+	if [ ! -f "/proc/sys/net/ipv6/conf/$_BRIDGE/mtu" ]; then
+		die "$_BRIDGE does not exist"
+	fi
+}
+
+do_l2_system() {
+	check_bridge
+	if [ "" = "$_LOCAL_NAME" ]; then
+		die "Need a local interface name"
+	fi
+	unshare -n sh 3</proc/self/ns/net -c 'set -euC
+if [ "0" = "$4" ]; then
+	sysctl -w net.ipv6.conf.all.accept_ra=0 net.ipv6.conf.default.accept_ra=0
+fi
+ip link set lo up
+ip link add name eth0 type veth peer name "$2" netns /proc/self/fd/3
+for _addr in $3; do
+	ip addr add "$_addr" dev eth0
+done
+if [ "" = "$5" ]; then
+	ip link set eth0 up
+else
+	ip link set eth0 address "$5" up
+fi
+case "$6" in
+	*:*)
+		ip route add 0.0.0.0/0 via inet6 "$6" dev eth0
+		;;
+	*.*)
+		ip route add 0.0.0.0/0 via "$6" dev eth0
+		;;
+esac
+case "$7" in
+	*:*)
+		ip route add ::/0 via "$7" dev eth0
+		;;
+esac
+umask 077
+:>"$1"
+mount --bind /proc/self/ns/net -- "$1"' "$_NETNS_NAME" "$_LOCAL_NAME" "$_ADDRESSES" "$_DO_ACCEPT_RA" "$_MACADDR" "$_IPV4_GW" "$_IPV6_GW"
+
+case "$_MACADDR_LOCAL" in
+	*:*)
+		ip link set "$_LOCAL_NAME" master "$_BRIDGE" address "$_MACADDR_LOCAL" up
+		;;
+	*)
+		ip link set "$_LOCAL_NAME" master "$_BRIDGE" up
+		;;
+esac
+}
+
+do_l3_system() {
+	if [ "" = "$_LOCAL_NAME" ]; then
+		die "Need a local interface name"
+	fi
+	unshare -n sh 3</proc/self/ns/net -c 'set -euC
+sysctl -w net.ipv6.conf.all.accept_ra=0 net.ipv6.conf.default.accept_ra=0
+ip link set lo up
+for _route in $4; do
+	ip route add blackhole "$_route"
+done
+for _route in $5; do
+	ip route add unreachable "$_route"
+done
+for _route in $6; do
+	ip route add local "$_route" dev lo
+done
+ip link add name eth0 type veth peer name "$2" netns /proc/self/fd/3
+for _addr in $3; do
+	ip addr add "$_addr" dev eth0
+done
+ip link set eth0 address 00:00:5e:00:53:40 up
+
+umask 077
+:>"$1"
+mount --bind /proc/self/ns/net -- "$1"' "$_NETNS_NAME" "$_LOCAL_NAME" "$_ADDRESSES" "$_ROUTES_NULL" "$_ROUTES_ERR" "$_ROUTES_LOCAL"
+for _addr in $_IPV4_DUMMY; do
+	ip addr add "$_addr" dev "$_LOCAL_NAME"
+done
+ip link set "$_LOCAL_NAME" address 00:00:5e:00:53:41 up
+for _route in $_ROUTES_NULL $_ROUTES_ERR $_ROUTES_LOCAL $_ADDRESSES; do
+	ip route add "$_route" via inet6 fe80::200:5eff:fe00:5340 dev "$_LOCAL_NAME"
+done
+nsenter --net="$_NETNS_NAME" sh -c 'set -eu; ip route add 0.0.0.0/0 via inet6 fe80::200:5eff:fe00:5341 dev eth0; ip route add ::/0 via inet6 fe80::200:5eff:fe00:5341 dev eth0'
+}
+
+_mode=
+
+while [ -n "${1:-}" ]; do
+	case "$1" in
+		routes_null=*)
+			_ROUTES_NULL="${1#routes_null=}"
+			;;
+		routes_err=*)
+			_ROUTES_ERR="${1#routes_err=}"
+			;;
+		routes_local=*)
+			_ROUTES_LOCAL="${1#routes_local=}"
+			;;
+		address=*)
+			_ADDRESSES="${1#address=}"
+			;;
+		mac=*)
+			_MACADDR="${1#mac=}"
+			;;
+		mac_local=*)
+			_MACADDR_LOCAL="${1#mac_local=}"
+			;;
+		br=*)
+			_BRIDGE="${1#br=}"
+			;;
+		netns=*)
+			_NETNS_NAME="${1#netns=}"
+			;;
+		local_if=*)
+			_LOCAL_NAME="${1#local_if=}"
+			;;
+		ipv4_gw=*)
+			_IPV4_GW="${1#ipv4_gw=}"
+			;;
+		ipv6_gw=*)
+			_IPV6_GW="${1#ipv6_gw=}"
+			;;
+		local_addr=*)
+			_IPV4_DUMMY="${1#local_addr=}"
+			;;
+		accept_ra=*)
+			_DO_ACCEPT_RA="${1#accept_ra=}"
+			;;
+		mode=*)
+			_mode="${1#mode=}"
+			;;
+		*)
+			die "Unknown option $1"
+			;;
+	esac
+	shift
+done
+if [ -z "$_NETNS_NAME" ]; then
+	die "netns= is required"
+fi
+fix_netns_name
+if [ -z "$_LOCAL_NAME" ]; then
+	die "local_if is required"
+fi
+case "$_mode" in
+	l3_system)
+		do_l3_system
+		;;
+	l2_system)
+		do_l2_system
+		;;
+	*)
+		die "Unknown mode $_mode"
+		;;
+esac
