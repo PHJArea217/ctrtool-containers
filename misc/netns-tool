@@ -15,8 +15,8 @@ _IPV4_GW=
 _IPV6_GW=
 _IPV4_DUMMY=
 _DO_ACCEPT_RA=0
-IFS='
- '
+IFS=' 	
+'
 export IFS
 die() {
 	printf '%s\n' "$*" >&2
