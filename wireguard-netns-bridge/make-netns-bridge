@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+ip link add "$1" type bridge
+ip link set "$1" address "$2" up

@@ -1,0 +1,174 @@
+#!/bin/sh
+set -eu
+
+v4_fw_policy=none
+v6_fw_policy=none
+local_if=
+wg_if=wg0
+netns=
+wg_addresses=
+lan_addresses=
+bring_veth_up=0
+bridge=
+lan_macaddr=
+veth_macaddr=
+wg_conf=
+wg_unreach=
+IFS=' 	
+'
+export IFS
+die() {
+	printf >&2 '%s\n' "$1"
+	exit 1
+}
+while [ -n "${1:-}" ]; do
+	case "$1" in
+		v4_fw)
+			v4_fw_policy=fw
+			;;
+		v6_fw)
+			v6_fw_policy=fw
+			;;
+		v4_nat)
+			v4_fw_policy=nat
+			;;
+		v6_nat)
+			v6_fw_policy=nat
+			;;
+		local_if=*)
+			local_if="${1#local_if=}"
+			;;
+		wg_if=*)
+			wg_if="${1#wg_if=}"
+			;;
+		netns=*)
+			netns="${1#netns=}"
+			;;
+		wg_addresses=*)
+			wg_addresses="${1#wg_addresses=}"
+			;;
+		lan_addresses=*)
+			lan_addresses="${1#lan_addresses=}"
+			;;
+		veth_up)
+			bring_veth_up=1
+			;;
+		bridge=*)
+			bridge="${1#bridge=}"
+			;;
+		lan_macaddr=*)
+			lan_macaddr="${1#lan_macaddr=}"
+			;;
+		veth_macaddr=*)
+			veth_macaddr="${1#veth_macaddr=}"
+			;;
+		wg_conf=*)
+			wg_conf="${1#wg_conf=}"
+			;;
+		wg_unreach=*)
+			wg_unreach="${1#wg_unreach=}"
+			;;
+	esac
+	shift
+done
+
+if [ "" = "$netns" ]; then
+	die "netns= is required"
+fi
+
+if [ "" = "$local_if" ]; then
+	die "local_if= is required"
+fi
+
+if [ "" = "$wg_conf" ]; then
+	die "wg_conf= is required"
+fi
+
+case "$netns" in
+	*/*)
+		;;
+	*)
+		netns=/run/netns/"$netns"
+		mkdir -p /run/netns
+		;;
+esac
+
+ip link add "$wg_if" type wireguard
+trap 'ip link del "$wg_if"' EXIT
+wg setconf "$wg_if" -- "$wg_conf"
+trap 'false' EXIT
+unshare -n sh -c 'set -eu
+trap "nsenter --net=/proc/self/fd/3 ip link del "\"\$1\" EXIT
+nsenter --net=/proc/self/fd/3 ip link set "$1" netns /proc/self/fd/4 4</proc/self/ns/net
+trap "" EXIT
+sysctl -w net/ipv6/conf/all/accept_ra=0 net/ipv6/conf/default/accept_ra=0 net/ipv6/conf/"$1"/accept_ra=0
+ip link set lo up
+for _route in $4; do
+	ip route add unreachable "$_route"
+done
+do_fw() {
+	"$1" -t filter -A INPUT -i "$2" -m state --state RELATED,ESTABLISHED -j ACCEPT
+	"$1" -t filter -A INPUT -i "$2" -j DROP
+	"$1" -t filter -A FORWARD -i "$2" -m state --state RELATED,ESTABLISHED -j ACCEPT
+	"$1" -t filter -A FORWARD -i "$2" -j DROP
+}
+case "$5" in
+	none)
+		;;
+	fw)
+		do_fw iptables-nft "$1"
+		;;
+	nat)
+		do_fw iptables-nft "$1"
+		iptables-nft -t nat -A POSTROUTING -o "$1" -j MASQUERADE
+		;;
+	*)
+		exit 1
+		;;
+esac
+case "$6" in
+	none)
+		;;
+	fw)
+		do_fw ip6tables-nft "$1"
+		;;
+	nat)
+		do_fw ip6tables-nft "$1"
+		ip6tables-nft -t nat -A POSTROUTING -o "$1" -j MASQUERADE
+		;;
+	*)
+		exit 1
+		;;
+esac
+ip link add lan0 type veth peer name "$3" netns /proc/self/fd/3
+for _addr in $2; do
+	ip addr add "$_addr" dev "$1"
+done
+for _addr in $7; do
+	ip addr add "$_addr" dev lan0
+done
+ip link set dev "$1" up
+if [ -n "$8" ]; then
+	ip link set lan0 address "$8"
+fi
+ip link set lan0 up
+ip route add ::/0 dev "$1"
+ip route add 0.0.0.0/0 dev "$1"
+sysctl -w net.ipv6.conf.all.forwarding=1 net.ipv4.ip_forward=1
+set -C
+umask 077
+:>"$9"
+mount --bind /proc/self/ns/net -- "$9"' \
+	- "$wg_if" "$wg_addresses" "$local_if" "$wg_unreach" \
+	"$v4_fw_policy" "$v6_fw_policy" "$lan_addresses" "$lan_macaddr" \
+	"$netns" 3</proc/self/ns/net
+
+if [ -n "$veth_macaddr" ]; then
+	ip link set dev "$local_if" address "$veth_macaddr"
+fi
+if [ -n "$bridge" ]; then
+	ip link set dev "$local_if" master "$bridge"
+fi
+if [ "1" = "$bring_veth_up" ]; then
+	ip link set dev "$local_if" up
+fi
