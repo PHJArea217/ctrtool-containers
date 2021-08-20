@@ -68,6 +68,9 @@ while [ -n "${1:-}" ]; do
 		wg_unreach=*)
 			wg_unreach="${1#wg_unreach=}"
 			;;
+		*)
+			die "Unknown parameter $1"
+			;;
 	esac
 	shift
 done
@@ -95,7 +98,7 @@ esac
 
 ip link add "$wg_if" type wireguard
 trap 'ip link del "$wg_if"' EXIT
-wg setconf "$wg_if" -- "$wg_conf"
+wg setconf "$wg_if" "$wg_conf"
 trap 'false' EXIT
 unshare -n sh -c 'set -eu
 trap "nsenter --net=/proc/self/fd/3 ip link del "\"\$1\" EXIT
