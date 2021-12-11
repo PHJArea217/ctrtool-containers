@@ -1,0 +1,73 @@
+#!/bin/sh
+set -eu
+_ROUTE_TABLE="$1"
+_INTERFACE="$2"
+_LOCAL_ADDR="$3"
+_FORMAT="$4"
+
+do_iproute2_foreign() {
+	if [ "x$4" = "x" ]; then
+		printf 'route add to "%s" via inet6 "%s" dev "%s" table "%s"\n' "$1" "$2" "$3" "${R_TABLE:-main}"
+	else
+		printf 'route add to "%s" via "%s" dev "%s" table "%s"\n' "$1" "$4" "$3" "${R_TABLE:-main}"
+	fi
+}
+do_iproute2_local() {
+	printf 'route add "%s" to "%s" table "%s"\n' "$2" "$1" "${R_TABLE:-main}"
+}
+case "$_FORMAT" in
+	iproute2-localonly)
+		_FORMAT="iproute2-localonly-unreachable"
+		;;
+	iproute2-both|iproute2)
+		_FORMAT="iproute2-both-unreachable"
+		;;
+esac
+while read -r DEST GATEWAY IPV4; do
+	if [ "" = "$DEST" ]; then
+		continue
+	fi
+	case "$DEST" in
+		\#*)
+			continue
+			;;
+	esac
+	IS_LOCAL=0
+	if [ "x$_LOCAL_ADDR" = "x$GATEWAY" ]; then
+		IS_LOCAL=1
+	fi
+	case "$_FORMAT" in
+		iproute2-foreignonly)
+			if [ "0" = "$IS_LOCAL" ]; then
+				do_iproute2_foreign "$DEST" "$GATEWAY" "$_INTERFACE" "$IPV4"
+			fi
+			;;
+		iproute2-localonly-*)
+			if [ "1" = "$IS_LOCAL" ]; then
+				do_iproute2_local "$DEST" "${_FORMAT##iproute2-localonly-}"
+			fi
+			;;
+		iproute2-both-*)
+			if [ "1" = "$IS_LOCAL" ]; then
+				do_iproute2_local "$DEST" "${_FORMAT##iproute2-both-}"
+			else
+				do_iproute2_foreign "$DEST" "$GATEWAY" "$_INTERFACE" "$IPV4"
+			fi
+			;;
+		bird)
+			if [ "1" = "$IS_LOCAL" ]; then
+				printf 'route "%s" via "lo"\n' "$DEST"
+			else
+				if [ "x" = "x$IPV4" ] && [ "${GATEWAY##fe80:}" != "$GATEWAY" ]; then
+					printf 'route "%s" via "%s%%%s"\n' "$DEST" "$GATEWAY" "$_INTERFACE"
+				else
+					printf 'route "%s" via "%s"\n' "$DEST" "${IPV4:-$GATEWAY}"
+				fi
+			fi
+			;;
+		*)
+			printf 'Unknown format %s\n' "$_FORMAT" >&2
+			exit 1
+			;;
+	esac
+done < "$_ROUTE_TABLE"
