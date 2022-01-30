@@ -4,6 +4,8 @@
 	"userns_owner_uid": 120,
 	"pdisk_path": "/disk/throwaway-rw_test_1",
 	"mac_address": "08:00:27:f0:00:01",
+	"ip": "192.168.1.10/24 fd00:1234:5678:aaaa::2/64 2001:db8:5678:aaaa::2/64",
 	"username": "daniel",
+	"hostname": "throwaway-1-1",
 	"config_bundle": "/disk/test-bundle.tar.gz"
 }
