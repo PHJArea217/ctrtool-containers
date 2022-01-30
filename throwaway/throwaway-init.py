@@ -31,6 +31,7 @@ sys_groups = [
 
 os.unlink("/etc")
 os.mkdir("/etc", 0o755)
+os.mkdir("/etc/timidity", 0o755)
 
 os.umask(0o077)
 with open("/etc/passwd", "x") as passwd_file, open("/etc/shadow", "x") as shadow_file:
@@ -94,8 +95,10 @@ dev_log_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
 dev_log_socket.bind("/dev/log")
 os.chmod("/dev/log", 0o777)
 
+
 subprocess.Popen(["setpriv", "--reuid=syslog", "--regid=syslog", "--clear-groups", "/_throwaway_root/_system/bin/ctrtool", "syslogd"], stdin=dev_log_socket)
 
 subprocess.run("if [ -r /_throwaway_config/init.local ]; then . /_throwaway_config/init.local; fi", shell=True, check=True)
 
+os.system('set -eu; cd /etc; for dir in /_throwaway_root/throwaway/etc/*; do if [ ! -h "${dir##*/}" ] && [ ! -e "${dir##*/}" ]; then ln -s "$dir" >/dev/null 2>&1 || :; fi; done')
 os.execv("/_throwaway_root/_system/bin/busybox-d", ['init'])

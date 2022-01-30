@@ -18,6 +18,8 @@ os.environ['THROWAWAY_PDISK_PATH'] = throwaway_pdisk
 
 throwaway_mac = str(config_json['mac_address'])
 os.environ['THROWAWAY_MAC_ADDRESS'] = throwaway_mac
+throwaway_ip = str(config_json['ip'])
+os.environ['THROWAWAY_IP_ADDRESS'] = throwaway_ip
 
 throwaway_hostname = str(config_json['hostname']) if 'hostname' in config_json else 'throwaway'
 
@@ -42,6 +44,8 @@ set -eu
 "$CTRTOOL" rootfs-mount -o root_link_opts=usr_ro -o root_symlink_usr=1 -o mount_sysfs=1 /proc/driver
 "$CTRTOOL" mount_seq -c /proc/driver \
         -m _throwaway_root -E -s "$THROWAWAY_MOUNT_PATH" -r -Obosd \
+        -m ctr_fs1 -E -s /container_images/ctr_fs1 -r -Obosd \
+        -m ctr_fs2 -E -s /container_images/ctr_fs2 -r -Obosd \
         -m _pdisk -E -s "$THROWAWAY_PDISK_PATH" -Ob \
         -l _fsroot_ro -s _throwaway_root/throwaway \
         -D _fsroot_rw -M 0755 \
@@ -49,10 +53,15 @@ set -eu
 if [ -n "${THROWAWAY_CONFIG_BUNDLE}" ]; then
     bsdtar -x --no-same-owner -C /proc/driver/_throwaway_config -f "$THROWAWAY_CONFIG_BUNDLE"
 fi
-cp /disk/throwaway_lib/throwaway-init.py /proc/driver/init.py
+cp /throwaway_lib/throwaway-init.py /proc/driver/init.py
 chmod +x /proc/driver/init.py
 ip link set lo up
+for x in $THROWAWAY_IP_ADDRESS; do
+    ip addr add "$x" dev eth0
+done
 ip link set eth0 address "$THROWAWAY_MAC_ADDRESS" up
+ip route add ::/0 via fe80::300:0:0:1 dev eth0
+ip route add 0.0.0.0/0 via inet6 fe80::300:0:0:1 dev eth0
 EOF
 ''', '-b0xc85fb', '--hostname=' + throwaway_hostname]
 
