@@ -44,6 +44,7 @@ else:
     netns_switch = '--net="/proc/self/fd/$2/ns/net"'
     netns_flag = 'n'
 if 'netns_veth_name' in extra_args:
+    netns_veth_name = extra_args['netns_veth_name']
     netns_veth = f'ip link add name "{netns_veth_name}" type veth peer name eth0 netns /proc/self/fd/"$2"/root/proc/driver/run/netns/__host__\n'
     if 'netns_veth_extra_config' in selected_snippets:
         netns_veth = netns_veth + f'''
@@ -77,7 +78,7 @@ with open(install_dir + "/start.py", 'w') as start_script:
 import os
 ctrtool = """''' + ctrtool_path + '''"""
 os.environ['CTRTOOL'] = ctrtool
-os.execv(ctrtool, ['launcher', '-U', '--escape', '--uid-map=''' + uid_map + '''', '--gid-map=''' + gid_map + '''', '-s', '-w', '--script-is-shell', '-V', """--script=/bin/true;set -eu
+os.execvp(ctrtool, ['launcher', '-U', '--escape', '--uid-map=''' + uid_map + '''', '--gid-map=''' + gid_map + '''', '-s', '-w', '--script-is-shell', '-V', """--script=/bin/true;set -eu
 nsenter --user="/proc/self/fd/$2/ns/user" --ipc="/proc/self/fd/$2/ns/ipc" --mount="/proc/self/fd/$2/ns/mnt" ''' + netns_switch + ''' sh -c 'set -eu
 "$CTRTOOL" rootfs-mount -o root_link_opts=all_rw -o mount_sysfs=1 /proc/driver
 "$CTRTOOL" mount_seq -c /proc/driver -m _fsroot_rw -E -s "$1/rootfs/_root" -Obv \\
