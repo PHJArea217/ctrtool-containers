@@ -37,6 +37,35 @@ os.mkdir(install_dir + "/config_dir", mode=0o700)
 ctrtool_path = extra_args['ctrtool'] if 'ctrtool' in extra_args else 'ctrtool'
 selected_snippets = extra_args['snippets'].split(',') if 'snippets' in extra_args else []
 flags = extra_args['flags'].split(',') if 'flags' in extra_args else []
+if 'cgroup' in extra_args:
+    cgroup_path_array = []
+    for path_part in extra_args['cgroup'].split('/'):
+        if (path_part == '') or (path_part == '.'):
+            continue
+        elif (path_part == '..'):
+            sys.stderr.write(".. not allowed in cgroup\n")
+            sys.exit(1)
+        else:
+            for _char in path_part:
+                if _char not in '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-.@_':
+                    sys.stderr.write(_char + ' not allowed in cgroup\n')
+                    sys.exit(1)
+        cgroup_path_array.append(path_part)
+    cgroup_path = '/'.join(cgroup_path_array)
+    cgroup_init = f"""cgroup_path = ['''/sys/fs/cgroup/{cgroup_path}''', {root_uid}, {root_gid}]\n""" + \
+            """subprocess.run(['find', cgroup_path[0], '-type', 'd', '-depth', '-execdir', 'rmdir', '--', '{}', '+'], check=True)
+root_uid = cgroup_path[1]
+root_gid = cgroup_path[2]
+os.mkdir(cgroup_path[0])
+os.chown(cgroup_path[0], root_uid, root_gid)
+os.chown(cgroup_path[0] + "/cgroup.procs", root_uid, root_gid)
+os.chown(cgroup_path[0] + "/cgroup.subtree_control", root_uid, root_gid)
+os.chown(cgroup_path[0] + "/cgroup.threads", root_uid, root_gid)
+"""
+    cgroup_write_pid = ', """-P' + cgroup_path[0] + '/cgroup.procs"""'
+else:
+    cgroup_init = ''
+    cgroup_write_pid = ''
 if 'netns_ambient' in flags:
     netns_switch = 'unshare -n'
     netns_flag = ''
@@ -75,10 +104,11 @@ if rootfs_tar != "/dev/null":
 
 with open(install_dir + "/start.py", 'w') as start_script:
     start_script.write('''#!/usr/bin/python3
-import os
+import os, subprocess
+''' + cgroup_init + '''
 ctrtool = """''' + ctrtool_path + '''"""
 os.environ['CTRTOOL'] = ctrtool
-os.execvp(ctrtool, ['launcher', '-U', '--escape', '--uid-map=''' + uid_map + '''', '--gid-map=''' + gid_map + '''', '-s', '-w', '--script-is-shell', '-V', """--script=/bin/true;set -eu
+os.execvp(ctrtool, ['launcher', '-U', "--escape"''' + cgroup_write_pid + ''', '--uid-map=''' + uid_map + '''', '--gid-map=''' + gid_map + '''', '-s', '-w', '--script-is-shell', '-V', """--script=/bin/true;set -eu
 nsenter --user="/proc/self/fd/$2/ns/user" --ipc="/proc/self/fd/$2/ns/ipc" --mount="/proc/self/fd/$2/ns/mnt" ''' + netns_switch + ''' sh -c 'set -eu
 "$CTRTOOL" rootfs-mount -o root_link_opts=all_rw -o mount_sysfs=1 /proc/driver
 "$CTRTOOL" mount_seq -c /proc/driver -m _fsroot_rw -E -s "$1/rootfs/_root" -Obv \\
