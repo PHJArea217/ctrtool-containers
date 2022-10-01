@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+ip link add "$1" type vrf table "$2"
+ip link set "$1" up
+if [ "local_setup" = "${3:-}" ]; then
+	ip -4 rule add priority 1200 lookup local
+	ip -6 rule add priority 1200 lookup local
+	ip -4 rule del priority 0 lookup local
+	ip -6 rule del priority 0 lookup local
+fi
