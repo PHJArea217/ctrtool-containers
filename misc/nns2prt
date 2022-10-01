@@ -1,0 +1,84 @@
+#!/bin/sh
+set -eu
+
+_ROUTE_TABLE=
+_PRIORITY=
+_NETNS=
+_ROUTES_IPV4=
+_ROUTES_IPV6=
+_LOCAL_ADDR=
+_FOREIGN_ADDR=
+_LOCAL_IF=
+_FOREIGN_IF=
+
+for arg in "$@"; do
+	case "$arg" in
+		table=*)
+			_ROUTE_TABLE="${arg##table=}"
+			;;
+		priority=*)
+			_PRIORITY="${arg##priority=}"
+			;;
+		netns=*)
+			_NETNS="${arg##netns=}"
+			;;
+		routes_ipv4=*)
+			_ROUTES_IPV4="${arg##routes_ipv4=}"
+			;;
+		routes_ipv6=*)
+			_ROUTES_IPV6="${arg##routes_ipv6=}"
+			;;
+		local_addr=*)
+			_LOCAL_ADDR="${arg##local_addr=}"
+			;;
+		foreign_addr=*)
+			_FOREIGN_ADDR="${arg##foreign_addr=}"
+			;;
+		local_if=*)
+			_LOCAL_IF="${arg##local_if=}"
+			;;
+		foreign_if=*)
+			_FOREIGN_IF="${arg##foreign_if=}"
+			;;
+		*)
+			printf >&2 'Unknown option %s\n' "$arg"
+			exit 1
+			;;
+	esac
+done
+
+if [ "" = "$_FOREIGN_IF" ]; then printf >&2 'missing foreign_if=[interface in foreign netns]\n'; exit 1; fi
+if [ "" = "$_LOCAL_IF" ]; then printf >&2 'missing local_if=[interface in local netns]\n'; exit 1; fi
+if [ "" = "$_LOCAL_ADDR" ]; then printf >&2 'missing local_addr=[IP addresses of local interface]\n'; exit 1; fi
+if [ "" = "$_NETNS" ]; then printf >&2 'missing netns=[full path to network namespace]\n'; exit 1; fi
+if [ "" = "$_PRIORITY" ]; then printf >&2 'missing priority=[priority of policy routing table]\n'; exit 1; fi
+if [ "" = "$_TABLE" ]; then printf >&2 'missing table=[policy routing table name or number]\n'; exit 1; fi
+ip link add name "$_LOCAL_IF" type veth peer name "$_FOREIGN_IF" netns /proc/self/fd/3 3<"$_NETNS"
+nsenter --net="$_NETNS" sh -eu -c 'for _addr in $1; do
+	ip addr add "$_addr" dev "$2"
+done
+ip link set "$2" address "00:00:5e:00:53:e0" up
+for _route in $3; do
+	ip route add "$_route" via inet6 "fe80::200:5eff:fe00:53e1" dev "$2"
+done' _ "$_FOREIGN_ADDR" "$_FOREIGN_IF" "$_ROUTES_IPV4 $_ROUTES_IPV6"
+sysctl -w "net/ipv4/conf/$_LOCAL_IF/rp_filter=0"
+ip -4 rule add priority "$((_PRIORITY+0))" iif "$_LOCAL_IF" lookup "$_TABLE"
+ip -6 rule add priority "$((_PRIORITY+0))" iif "$_LOCAL_IF" lookup "$_TABLE"
+ip -4 route add unreachable "0.0.0.0/0" metric 4294967295 table "$_TABLE"
+ip -6 route add unreachable "::/0" metric 4294967295 table "$_TABLE"
+for _route in $_ROUTES_IPV4; do
+	ip -4 route add local "$_route" dev lo
+	ip -4 route add local "$_route" dev lo table "$_TABLE"
+	ip -4 rule add priority "$((_PRIORITY+1))" from "$_route" iif lo lookup "$_TABLE"
+done
+for _route in $_ROUTES_IPV6; do
+	ip -6 route add local "$_route" dev lo
+	ip -6 route add local "$_route" dev lo table "$_TABLE"
+	ip -6 rule add priority "$((_PRIORITY+1))" from "$_route" iif lo lookup "$_TABLE"
+done
+for _addr in $_LOCAL_ADDR; do
+	ip addr add "$_addr" dev "$_LOCAL_IF"
+done
+ip link set "$_LOCAL_IF" address "00:00:5e:00:53:e1" up
+ip -4 route add "0.0.0.0/0" via inet6 "fe80::200:5eff:fe00:53e0" dev "$_LOCAL_IF" table "$_TABLE"
+ip -6 route add "::/0" via inet6 "fe80::200:5eff:fe00:53e0" dev "$_LOCAL_IF" table "$_TABLE"
