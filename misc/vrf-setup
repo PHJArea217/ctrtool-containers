@@ -8,5 +8,5 @@ if [ "local_setup" = "${3:-}" ]; then
 	ip -6 rule del priority 0 lookup local
 fi
 ip route add unreachable "::/0" dev "$1" vrf "$1" metric 4294967295
-ip route add unreachable "0.0.0.0/0" dev "$1" vrf "$1" metric 4294967295
+ip route add unreachable "0.0.0.0/0" vrf "$1" metric 4294967295
 ip link set "$1" up
