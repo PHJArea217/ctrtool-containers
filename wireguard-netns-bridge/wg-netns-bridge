@@ -175,3 +175,5 @@ fi
 if [ "1" = "$bring_veth_up" ]; then
 	ip link set dev "$local_if" up
 fi
+trap '' EXIT
+exit 0

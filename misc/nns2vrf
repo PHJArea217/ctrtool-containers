@@ -60,16 +60,16 @@ for _route in $3; do
 done' _ "$_FOREIGN_ADDR" "$_FOREIGN_IF" "$_ROUTES_IPV4 $_ROUTES_IPV6"
 sysctl -w "net/ipv4/conf/$_LOCAL_IF/rp_filter=0"
 for _route in $_ROUTES_IPV4; do
-	ip -4 route add local "$_route" dev "$_VRF"
+	ip -4 route add local "$_route" vrf "$_VRF" dev "$_VRF"
 done
 for _route in $_ROUTES_IPV6; do
-	ip -6 route add local "$_route" dev "$_VRF"
+	ip -6 route add local "$_route" vrf "$_VRF" dev "$_VRF"
 done
 for _addr in $_LOCAL_ADDR; do
 	ip addr add "$_addr" dev "$_LOCAL_IF"
 done
 ip link set "$_LOCAL_IF" address "00:00:5e:00:53:e1" up
-ip -4 route add "0.0.0.0/1" via inet6 "fe80::200:5eff:fe00:53e0" dev "$_LOCAL_IF"
-ip -4 route add "128.0.0.0/1" via inet6 "fe80::200:5eff:fe00:53e0" dev "$_LOCAL_IF"
-ip -6 route add "::/1" via inet6 "fe80::200:5eff:fe00:53e0" dev "$_LOCAL_IF"
-ip -6 route add "8000::/1" via inet6 "fe80::200:5eff:fe00:53e0" dev "$_LOCAL_IF"
+ip -4 route add "0.0.0.0/1" via inet6 "fe80::200:5eff:fe00:53e0" vrf "$_VRF" dev "$_LOCAL_IF"
+ip -4 route add "128.0.0.0/1" via inet6 "fe80::200:5eff:fe00:53e0" vrf "$_VRF" dev "$_LOCAL_IF"
+ip -6 route add "::/1" via inet6 "fe80::200:5eff:fe00:53e0" vrf "$_VRF" dev "$_LOCAL_IF"
+ip -6 route add "8000::/1" via inet6 "fe80::200:5eff:fe00:53e0" vrf "$_VRF" dev "$_LOCAL_IF"
