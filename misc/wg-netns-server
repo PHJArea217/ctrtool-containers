@@ -22,6 +22,7 @@ for a in "$@"; do
 			;;
 		wg_conf=*)
 			_WG_CONF="${a##wg_conf=}"
+			;;
 		*)
 			printf >&2 'Unknown option %s\n' "$a"
 			exit 1
@@ -32,4 +33,4 @@ ip link add "$_WG_IF" type wireguard
 wg setconf "$_WG_IF" "$_WG_CONF"
 exec 3<"$_NETNS"
 ip link set "$_WG_IF" netns /proc/self/fd/3
-nsenter --net=/proc/self/fd/3 sh -c 'for a in $1; do ip addr add "$a" dev "$3"; done; ip link set dev "$3" up; for a in $2; do ip route add "$a" dev "$3"; done' "$_ADDRESSES" "$_ROUTES" "$_WG_IF"
+nsenter --net=/proc/self/fd/3 sh -eu -c 'for a in $1; do ip addr add "$a" dev "$3"; done; ip link set dev "$3" up; for a in $2; do ip route add "$a" dev "$3"; done' _ "$_ADDRESSES" "$_ROUTES" "$_WG_IF"
