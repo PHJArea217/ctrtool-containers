@@ -1,0 +1,35 @@
+#!/bin/sh
+
+set -eu
+_ADDRESSES=
+_ROUTES=
+_NETNS=/proc/self/ns/net
+_WG_IF=wg0
+_WG_CONF=/dev/null
+for a in "$@"; do
+	case "$a" in
+		addresses=*)
+			_ADDRESSES="${a##addresses=}"
+			;;
+		routes=*)
+			_ROUTES="${a##routes=}"
+			;;
+		netns=*)
+			_NETNS="${a##netns=}"
+			;;
+		wg_if=*)
+			_WG_IF="${a##wg_if=}"
+			;;
+		wg_conf=*)
+			_WG_CONF="${a##wg_conf=}"
+		*)
+			printf >&2 'Unknown option %s\n' "$a"
+			exit 1
+			;;
+	esac
+done
+ip link add "$_WG_IF" type wireguard
+wg setconf "$_WG_IF" "$_WG_CONF"
+exec 3<"$_NETNS"
+ip link set "$_WG_IF" netns /proc/self/fd/3
+nsenter --net=/proc/self/fd/3 sh -c 'for a in $1; do ip addr add "$a" dev "$3"; done; ip link set dev "$3" up; for a in $2; do ip route add "$a" dev "$3"; done' "$_ADDRESSES" "$_ROUTES" "$_WG_IF"
