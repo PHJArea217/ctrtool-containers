@@ -41,11 +41,15 @@ if args.setup == True:
         "ipv6": ["2001:db8:0:1:300::1"],
         "net_iface_ip": ["172.19.255.1"],
         "net_iface": "vif0",
+        "files": [
+            ["/etc/passwd", {"mode": "755"}, "root:x:0:0:root:/root:/bin/bash\\n"],
+            ["/etc/group", {}, "root:x:0:0:root:/root:/bin/bash\\n"]
+        ],
         "hostname": "docker-in-ctrtool"
 }''')
     with open(real_directory + '/init.py', 'w') as init_py:
         init_py.write('''#!/usr/bin/env python3
-import ctypes, os, sys
+import ctypes, os, sys, json
 libc = ctypes.CDLL(None)
 libc.mount(b'none\\0', b'/sys/fs/cgroup\\0', b'cgroup2\\0', 0, None)
 os.mkdir('/sys/fs/cgroup/init.scope',mode=0o777)
@@ -53,6 +57,20 @@ with open('/sys/fs/cgroup/init.scope/cgroup.procs', 'w') as cgroup_procs:
     cgroup_procs.write('1')
 with open('/sys/fs/cgroup/cgroup.subtree_control', 'w') as cgroup_procs:
     cgroup_procs.write('+memory +pids')
+config_json = json.load(open('/run/d-in-c-config/config.json', 'r'))
+os.umask(0o077)
+for f in config_json['files']:
+    if 'type' in f[1]:
+        if f[1]['type'] == 'dir':
+            os.mkdir(f[0], mode=0o755)
+            if 'mode' in f[1]:
+                os.chmod(f[0], int(f[1].mode, base=8))
+            continue
+    with open(f[0], 'w') as the_file:
+        the_file.write(f[2])
+        if 'mode' in f[1]:
+            os.fchmod(the_file.fileno(),int(f[1].mode, base=8))
+
 ''')
     sys.exit(0)
 
@@ -100,6 +118,8 @@ nsenter --user=user --ipc=ipc --mount=mnt --net=net sh -eu -c '
 ctrtool rootfs-mount -o root_link_opts=usr_ro -o root_symlink_usr=1 -o mount_sysfs=1 /proc/driver
 cd /proc/driver
 ctrtool mount_seq -m "_fsroot_rw" -E -s "$D_IN_C_DIR/rootfs/_root" -Obv -m "run/host_shared" -E -s "$D_IN_C_RUNDIR" -Ob -D _fsroot_ro -M 0755 -m "_fsroot_ro/usr" -E -s /usr -Obv
+mkdir run/d-in-c-config
+cp "$D_IN_C_DIR/config.json" "$D_IN_C_DIR/init.py" run/d-in-c-config/
 if [ -x "$D_IN_C_DIR/setup_mount" ]; then "$D_IN_C_DIR/setup_mount"; fi
 '
 ip link add name "$D_IN_C_IFACE" type veth peer name eth0 netns "/proc/self/fd/$2/ns/net"
