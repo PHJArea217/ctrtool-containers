@@ -100,7 +100,7 @@ nsenter --user=user --ipc=ipc --mount=mnt --net=net sh -eu -c '
 ctrtool rootfs-mount -o root_link_opts=usr_ro -o root_symlink_usr=1 -o mount_sysfs=1 /proc/driver
 cd /proc/driver
 ctrtool mount_seq -m "_fsroot_rw" -E -s "$D_IN_C_DIR/rootfs/_root" -Obv -m "run/host_shared" -E -s "$D_IN_C_RUNDIR" -Ob -D _fsroot_ro -M 0755 -m "_fsroot_ro/usr" -E -s /usr -Obv
-[ -x "$D_IN_C_DIR/setup_mount" ] && "$D_IN_C_DIR/setup_mount"
+if [ -x "$D_IN_C_DIR/setup_mount" ]; then "$D_IN_C_DIR/setup_mount"; fi
 '
 ip link add name "$D_IN_C_IFACE" type veth peer name eth0 netns "/proc/self/fd/$2/ns/net"
 for n in $D_IN_C_LOCAL fe80::1; do ip addr add "$n" dev "$D_IN_C_IFACE"; done
