@@ -84,5 +84,5 @@ ip link add name "$D_IN_C_IFACE" type veth peer name eth0 netns "/proc/self/fd/$
 for n in $D_IN_C_LOCAL fe80::1; do ip addr add "$n" dev "$D_IN_C_IFACE"; done
 ip link set dev "$D_IN_C_IFACE" up
 for n in $D_IN_C_NETWORKS;do ip route add "$n" via inet6 "fe80::2" dev "$D_IN_C_IFACE";done
-                      ''', '-V', '--mount-proc', '--pivot-root=/proc/driver', '/bin/bash'])
+                      ''', '-V', '--mount-proc', '--pivot-root=/proc/driver', '/bin/sh', '-c', 'exec /bin/bash 2>&1'])
 # args.directory = 
