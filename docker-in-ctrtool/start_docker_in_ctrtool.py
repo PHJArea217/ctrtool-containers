@@ -53,7 +53,7 @@ if config['configured'] != True:
 os.chown(real_directory + '/rootfs', -1, config['root_gid'])
 os.chmod(real_directory + '/rootfs', 0o750)
 os.chown(real_directory + '/rootfs/_root', config['root_uid'], config['root_gid'])
-subprocess.run(['find', real_cgdir, '-depth', '-exec', 'rmdir', '--', '{}', '+'])
+subprocess.run(['find', real_cgdir, '-depth', '-type', 'd', '-exec', 'rmdir', '--', '{}', '+'])
 os.mkdir(real_cgdir, mode=0o777)
 os.chown(real_cgdir, config['root_uid'], config['root_gid'])
 os.chown(real_cgdir + '/cgroup.procs', config['root_uid'], config['root_gid'])
