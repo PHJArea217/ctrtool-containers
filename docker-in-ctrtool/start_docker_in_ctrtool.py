@@ -54,7 +54,7 @@ libc = ctypes.CDLL(None)
 libc.mount(b'none\\0', b'/sys/fs/cgroup\\0', b'cgroup2\\0', 0, None)
 os.mkdir('/sys/fs/cgroup/init.scope',mode=0o777)
 with open('/sys/fs/cgroup/init.scope/cgroup.procs', 'w') as cgroup_procs:
-    cgroup_procs.write('1')
+    cgroup_procs.write(f'1\\n{os.getpid()}\\n')
 with open('/sys/fs/cgroup/cgroup.subtree_control', 'w') as cgroup_procs:
     cgroup_procs.write('+memory +pids')
 config_json = json.load(open('/run/d-in-c-config/config.json', 'r'))
