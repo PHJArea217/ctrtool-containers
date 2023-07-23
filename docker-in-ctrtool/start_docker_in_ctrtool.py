@@ -74,7 +74,10 @@ os.mkdir(real_cgdir, mode=0o777)
 os.chown(real_cgdir, config['root_uid'], config['root_gid'])
 os.chown(real_cgdir + '/cgroup.procs', config['root_uid'], config['root_gid'])
 os.chown(real_cgdir + '/cgroup.subtree_control', config['root_uid'], config['root_gid'])
-os.mkdir(real_rundir, mode=0o777)
+try:
+    os.mkdir(real_rundir, mode=0o777)
+except:
+    pass
 os.chown(real_rundir, config['root_uid'], config['root_gid'])
 networks = []
 local_ip = []
