@@ -1,12 +1,28 @@
 #!/usr/bin/env python3
-import argparse, os, sys, json, subprocess, ipaddress
+import argparse, os, sys, json, subprocess, ipaddress, ctypes
 parser = argparse.ArgumentParser()
 parser.add_argument('group');
 parser.add_argument('-d', '--directory', default='/var/lib/_docker-in-ctrtool')
 parser.add_argument('-C', '--cgroup-directory', default='/sys/fs/cgroup/d-in-ctrtool')
 parser.add_argument('-R', '--run-directory', default='/run/_docker-in-ctrtool')
 parser.add_argument('-s', '--setup', action='store_true')
+parser.add_argument('-i', '--prepare', action='store_true')
 args = parser.parse_args()
+if args.prepare == True:
+    try:
+        os.mkdir(args.directory, mode=0o777)
+    except:
+        pass
+    try:
+        os.mkdir(args.cgroup_directory, mode=0o777)
+    except:
+        pass
+    with open(args.cgroup_directory + '/cgroup.subtree_control', 'w') as cgroup_sc:
+        cgroup_sc.write('+memory +pids')
+    os.mkdir(args.run_directory, mode=0o777)
+    subprocess.run(['ctrtool', 'mount_seq', '-m', args.run_directory + '_host', '-E', '-s', args.run_directory, '-Obsdx', '-F8'], check=True)
+    sys.exit(0)
+
 if args.setup == True:
     real_directory = args.directory + '/g-' + args.group
     os.mkdir(real_directory, mode=0o777)
@@ -58,6 +74,8 @@ os.mkdir(real_cgdir, mode=0o777)
 os.chown(real_cgdir, config['root_uid'], config['root_gid'])
 os.chown(real_cgdir + '/cgroup.procs', config['root_uid'], config['root_gid'])
 os.chown(real_cgdir + '/cgroup.subtree_control', config['root_uid'], config['root_gid'])
+os.mkdir(real_rundir, mode=0o777)
+os.chown(real_rundir, config['root_uid'], config['root_gid'])
 networks = []
 local_ip = []
 for n in config['ipv4']:
@@ -78,7 +96,7 @@ cd "/proc/self/fd/$2/ns"
 nsenter --user=user --ipc=ipc --mount=mnt --net=net sh -eu -c '
 ctrtool rootfs-mount -o root_link_opts=usr_ro -o root_symlink_usr=1 -o mount_sysfs=1 /proc/driver
 cd /proc/driver
-ctrtool mount_seq -m "_fsroot_rw" -E -s "$D_IN_C_DIR/rootfs/_root" -Obv -D _fsroot_ro -M 0755 -m "_fsroot_ro/usr" -E -s /usr -Obv
+ctrtool mount_seq -m "_fsroot_rw" -E -s "$D_IN_C_DIR/rootfs/_root" -Obv -m "run/host_shared" -E -s "$D_IN_C_RUNDIR" -Ob -D _fsroot_ro -M 0755 -m "_fsroot_ro/usr" -E -s /usr -Obv
 '
 ip link add name "$D_IN_C_IFACE" type veth peer name eth0 netns "/proc/self/fd/$2/ns/net"
 for n in $D_IN_C_LOCAL fe80::1; do ip addr add "$n" dev "$D_IN_C_IFACE"; done
