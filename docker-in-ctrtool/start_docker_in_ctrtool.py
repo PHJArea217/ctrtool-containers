@@ -72,12 +72,12 @@ for f in config_json['files']:
             except:
                 pass
             if dir_created and ('mode' in f[1]):
-                os.chmod(f[0], int(f[1].mode, base=8))
+                os.chmod(f[0], int(f[1]['mode'], base=8))
             continue
     with open(f[0], 'w') as the_file:
         the_file.write(f[2])
         if 'mode' in f[1]:
-            os.fchmod(the_file.fileno(),int(f[1].mode, base=8))
+            os.fchmod(the_file.fileno(),int(f[1]['mode'], base=8))
 
 ''')
     sys.exit(0)
@@ -134,5 +134,5 @@ ip link add name "$D_IN_C_IFACE" type veth peer name eth0 netns "/proc/self/fd/$
 for n in $D_IN_C_LOCAL fe80::1; do ip addr add "$n" dev "$D_IN_C_IFACE"; done
 ip link set dev "$D_IN_C_IFACE" up
 for n in $D_IN_C_NETWORKS;do ip route add "$n" via inet6 "fe80::2" dev "$D_IN_C_IFACE";done
-                      ''', '-V', '--mount-proc', '--pivot-root=/proc/driver', '/bin/sh', '-c', 'exec /bin/bash 2>&1'])
+                      ''', '-V', '--mount-proc', '--pivot-root=/proc/driver', '/bin/sh', '-c', 'python3 /run/d-in-c-config/init.py; exec /bin/bash 2>&1'])
 # args.directory = 
