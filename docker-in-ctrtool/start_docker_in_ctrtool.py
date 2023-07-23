@@ -56,6 +56,7 @@ libc.mount(b'none\\0', b'/sys/fs/cgroup\\0', b'cgroup2\\0', 0, None)
 os.mkdir('/sys/fs/cgroup/init.scope',mode=0o777)
 with open('/sys/fs/cgroup/init.scope/cgroup.procs', 'w') as cgroup_procs:
     cgroup_procs.write('1\\n')
+with open('/sys/fs/cgroup/init.scope/cgroup.procs', 'w') as cgroup_procs:
     cgroup_procs.write(f'{os.getpid()}\\n')
 with open('/sys/fs/cgroup/cgroup.subtree_control', 'w') as cgroup_procs:
     cgroup_procs.write('+memory +pids')
@@ -64,12 +65,14 @@ os.umask(0o077)
 for f in config_json['files']:
     if 'type' in f[1]:
         if f[1]['type'] == 'dir':
+            dir_created = False
             try:
                 os.mkdir(f[0], mode=0o755)
+                dir_created = True
             except:
                 pass
-            if 'mode' in f[1]:
-                os.lchmod(f[0], int(f[1].mode, base=8))
+            if dir_created and ('mode' in f[1]):
+                os.chmod(f[0], int(f[1].mode, base=8))
             continue
     with open(f[0], 'w') as the_file:
         the_file.write(f[2])
