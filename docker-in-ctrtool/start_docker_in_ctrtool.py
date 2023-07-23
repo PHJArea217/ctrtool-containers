@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse
+import argparse, os, sys, json, subprocess, ipaddress
 parser = argparse.ArgumentParser()
 parser.add_argument('group');
 parser.add_argument('-d', '--directory', default='/var/lib/_docker-in-ctrtool')
@@ -23,6 +23,8 @@ if args.setup == True:
         "route_ipv6": ["2001:db8:0:1:300::/72"],
         "ipv4": ["172.20.0.1"],
         "ipv6": ["2001:db8:0:1:300::1"],
+        "net_iface": "vif0",
+        "hostname": "docker-in-ctrtool"
 }''')
     with open(real_directory + '/init.py', 'w') as init_py:
         init_py.write('''#!/usr/bin/env python3
@@ -34,6 +36,42 @@ with open('/sys/fs/cgroup/init.scope/cgroup.procs', 'w') as cgroup_procs:
     cgroup_procs.write('1')
 with open('/sys/fs/cgroup/cgroup.subtree_control', 'w') as cgroup_procs:
     cgroup_procs.write('+memory +pids')
+''')
+    sys.exit(0)
 
+real_directory = args.directory + '/g-' + args.group
+real_cgdir = args.cgroup_directory + '/g-' + args.group
+real_rundir = args.run_directory + '/g-' + args.group
+os.setenv('D_IN_C_DIR', real_directory)
+os.setenv('D_IN_C_CGDIR', real_cgdir)
+os.setenv('D_IN_C_RUNDIR', real_rundir)
+networks = []
+config = json.load(open(real_directory + '/config.json', 'r'))
+if config['configured'] != True:
+    sys.stderr.write(f'{real_directory} not configured\n')
+    sys.exit(1)
+os.chown(real_directory + '/rootfs', -1, config['root_gid'])
+os.chmod(real_directory + '/rootfs', 0o750)
+os.chown(real_directory + '/rootfs/_root', config['root_uid'], config['root_gid'])
+subprocess.run(['find', real_cgdir, '-depth', '-exec', 'rmdir', '--', '{}', '+'])
+os.mkdir(real_cgdir, mode=0o777)
+os.chown(real_cgdir, config['root_uid'], config['root_gid'])
+os.chown(real_cgdir + '/cgroup.procs', config['root_uid'], config['root_gid'])
+os.chown(real_cgdir + '/cgroup.subtree_control', config['root_uid'], config['root_gid'])
+for n in config['ipv4']:
+    networks.append(ipaddress.IPv4Network(n))
+for n in config['route_ipv4']:
+    networks.append(ipaddress.IPv4Network(n))
+for n in config['ipv6']:
+    networks.append(ipaddress.IPv6Network(n))
+for n in config['route_ipv6']:
+    networks.append(ipaddress.IPv6Network(n))
+os.setenv('D_IN_C_IFACE', config['net_iface'])
+os.setenv('D_IN_C_NETWORKS', ' '.join(str(n) for n in networks))
+os.execvp('ctrtool', ['ctrtool', 'launcher', '-U', '--escape', '--uid-map=' + config['uid_map'], '--gid-map=' + config['gid_map'], '-Cimnpu', '--hostname=' + config['hostname'],f'--write-pid={real_cgdir}/cgroup.procs', '--script-is-shell', '''--script=/bin/true;set -eu
+cd "/proc/self/fd/$2/ns"
+nsenter --user=user --ipc=ipc --mount=mnt --net=net
 
+                      ip link add name "$D_IN_C_IFACE" type veth peer name eth0 netns "/proc/self/fd/$2/ns/net"
+                      for n in $D_IN_C_NETWORKS;do ip route add "$n" via inet6 "fe80::2" dev "$D_IN_C_IFACE"
 args.directory = 
