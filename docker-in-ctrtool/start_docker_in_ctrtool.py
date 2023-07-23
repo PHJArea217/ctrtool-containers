@@ -30,7 +30,7 @@ if args.setup == True:
     os.mkdir(real_directory + '/rootfs/_root', mode=0o777)
     with open(real_directory + '/config.json', 'w') as config_json:
         config_json.write('''{
-        "configured" false,
+        "configured": false,
         "root_uid": 100000,
         "root_gid": 100000,
         "uid_map": "0.100000.100000",
@@ -42,8 +42,9 @@ if args.setup == True:
         "net_iface_ip": ["172.19.255.1"],
         "net_iface": "vif0",
         "files": [
-            ["/etc/passwd", {"mode": "755"}, "root:x:0:0:root:/root:/bin/bash\\n"],
-            ["/etc/group", {}, "root:x:0:0:root:/root:/bin/bash\\n"]
+            ["/_fsroot_rw/etc", {"type": "dir", "mode": "755"}],
+            ["/etc/passwd", {"mode": "644"}, "root:x:0:0:root:/root:/bin/bash\\n"],
+            ["/etc/group", {"mode": "644"}, "root:x:0:0:root:/root:/bin/bash\\n"]
         ],
         "hostname": "docker-in-ctrtool"
 }''')
@@ -62,9 +63,12 @@ os.umask(0o077)
 for f in config_json['files']:
     if 'type' in f[1]:
         if f[1]['type'] == 'dir':
-            os.mkdir(f[0], mode=0o755)
+            try:
+                os.mkdir(f[0], mode=0o755)
+            except:
+                pass
             if 'mode' in f[1]:
-                os.chmod(f[0], int(f[1].mode, base=8))
+                os.lchmod(f[0], int(f[1].mode, base=8))
             continue
     with open(f[0], 'w') as the_file:
         the_file.write(f[2])
