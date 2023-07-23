@@ -43,9 +43,9 @@ with open('/sys/fs/cgroup/cgroup.subtree_control', 'w') as cgroup_procs:
 real_directory = args.directory + '/g-' + args.group
 real_cgdir = args.cgroup_directory + '/g-' + args.group
 real_rundir = args.run_directory + '/g-' + args.group
-os.setenv('D_IN_C_DIR', real_directory)
-os.setenv('D_IN_C_CGDIR', real_cgdir)
-os.setenv('D_IN_C_RUNDIR', real_rundir)
+os.putenv('D_IN_C_DIR', real_directory)
+os.putenv('D_IN_C_CGDIR', real_cgdir)
+os.putenv('D_IN_C_RUNDIR', real_rundir)
 config = json.load(open(real_directory + '/config.json', 'r'))
 if config['configured'] != True:
     sys.stderr.write(f'{real_directory} not configured\n')
@@ -70,9 +70,9 @@ for n in config['route_ipv6']:
     networks.append(ipaddress.IPv6Network(n))
 for n in config['net_iface_ip']:
     local_ip.append(ipaddress.ip_address(n))
-os.setenv('D_IN_C_IFACE', config['net_iface'])
-os.setenv('D_IN_C_NETWORKS', ' '.join(str(n) for n in networks))
-os.setenv('D_IN_C_LOCAL', ' '.join(str(n) for n in local_ip))
+os.putenv('D_IN_C_IFACE', config['net_iface'])
+os.putenv('D_IN_C_NETWORKS', ' '.join(str(n) for n in networks))
+os.putenv('D_IN_C_LOCAL', ' '.join(str(n) for n in local_ip))
 os.execvp('ctrtool', ['ctrtool', 'launcher', '-U', '--escape', '--alloc-tty', '--uid-map=' + config['uid_map'], '--gid-map=' + config['gid_map'], '-Cimnpu', '--hostname=' + config['hostname'],f'--write-pid={real_cgdir}/cgroup.procs', '--script-is-shell', '''--script=/bin/true;set -eu
 cd "/proc/self/fd/$2/ns"
 nsenter --user=user --ipc=ipc --mount=mnt --net=net sh -eu -c '
