@@ -43,6 +43,7 @@ if args.setup == True:
         "net_iface": "vif0",
         "files": [
             ["/_fsroot_rw/etc", {"type": "dir", "mode": "755"}],
+            ["/_fsroot_rw/var", {"type": "dir", "mode": "755"}],
             ["/etc/passwd", {"mode": "644"}, "root:x:0:0:root:/root:/bin/bash\\n"],
             ["/etc/group", {"mode": "644"}, "root:x:0:0:root:/root:/bin/bash\\n"]
         ],
