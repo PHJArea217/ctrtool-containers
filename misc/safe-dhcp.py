@@ -8,6 +8,7 @@ ap.add_argument('-v', '--vrf', default=None)
 ap.add_argument('-T', '--table', default=None)
 ap.add_argument('-n', '--dry-run', action='store_true')
 args = ap.parse_args()
+ArgumentError = Exception
 for set_arg in args.set:
     s = set_arg.split('=', maxsplit=1)
     os.environ[s[0]] = s[1]
@@ -44,20 +45,20 @@ def run_cmd(cmd, cmd_args):
 def change_ips(old=False, new=False):
     if old and 'old_routers' in os.environ:
         safe_v4 = get_safe_ipv4(str(os.environ['old_routers']).split(' ')[0])
-        run_cmd('set -eu; GW="${1%%/*}"; shift 1; ip route del 0.0.0.0/0 via "$GW" proto dhcp dev "$interface" "$@"', [safe_v4] + table_vrf)
+        run_cmd('set -eu; GW="${1%%/*}"; shift 1; ip route del 0.0.0.0/0 via "$GW" proto dhcp dev "$interface" "$@" || :', [safe_v4] + table_vrf)
     if old and 'old_ip_address' in os.environ:
         safe_v4 = get_safe_ipv4(os.environ['old_ip_address'], mask=os.environ.get('old_subnet_mask', '255.255.255.255'))
-        run_cmd('ip -4 addr del "$1" dev "$interface"', [safe_v4])
+        run_cmd('ip -4 addr del "$1" dev "$interface" || :', [safe_v4])
     if new and 'new_ip_address' in os.environ:
         safe_v4 = get_safe_ipv4(os.environ['new_ip_address'], mask=os.environ.get('new_subnet_mask', '255.255.255.255'))
         run_cmd('ip -4 addr add "$1" dev "$interface"', [safe_v4])
     if new and 'new_routers' in os.environ:
         safe_v4 = get_safe_ipv4(str(os.environ['new_routers']).split(' ')[0])
-        run_cmd('set -eu; GW="${1%%/*}"; shift 1; ip route del 0.0.0.0/0 via "$GW" proto dhcp dev "$interface" "$@"', [safe_v4] + table_vrf)
+        run_cmd('set -eu; GW="${1%%/*}"; shift 1; ip route add 0.0.0.0/0 via "$GW" proto dhcp dev "$interface" "$@"', [safe_v4] + table_vrf)
 def change_ipv6(old=False, new=False):
     if old and 'old_ip6_address' in os.environ:
         safe_v4 = get_safe_ipv6(str(os.environ['old_ip6_address']).split(' ')[0]) # ,mask=64
-        run_cmd('ip -6 addr del "$1" dev "$interface"', [safe_v4])
+        run_cmd('ip -6 addr del "$1" dev "$interface" || :', [safe_v4])
     if new and 'new_ip6_address' in os.environ:
         safe_v4 = get_safe_ipv6(str(os.environ['new_ip6_address']).split(' ')[0])
         run_cmd('ip -6 addr add "$1" dev "$interface"', [safe_v4])
@@ -74,9 +75,17 @@ def set_dns():
     if 'new_domain_name_servers' in os.environ:
         safe_v4 = get_safe_ipv4(str(os.environ['new_domain_name_servers']).split(' ')[0])
         run_cmd('resolvectl dns "$interface" "${1%%/*}"', [safe_v4])
+def printenv():
+    print('-----------------')
+    for k in os.environ:
+        print(f'{k}={os.environ[k]}')
 if reason == 'BOUND':
     change_ips(new=True)
     set_dns()
+elif reason == 'PREINIT':
+    run_cmd('ip link set dev "$interface" up', [])
+elif reason == 'PREINIT6':
+    run_cmd('ip link set dev "$interface" up', [])
 elif reason == 'TIMEOUT':
     change_ips(new=True)
     set_dns()
@@ -96,6 +105,23 @@ elif reason == 'REBIND':
     run_cmd('ip -4 neigh flush dev "$interface"', [])
     change_ips(new=True)
     set_dns()
+elif reason == 'BOUND6':
+    change_ipv6(new=True)
+elif reason == 'RENEW6':
+    change_ipv6(old=True)
+    change_ipv6(new=True)
+elif reason == 'REBIND6':
+    change_ipv6(old=True)
+    run_cmd('ip -6 neigh flush dev "$interface"', [])
+    change_ipv6(new=True)
+elif reason == 'EXPIRE6':
+    change_ipv6(old=True)
+elif reason == 'RELEASE6':
+    change_ipv6(old=True)
+elif reason == 'STOP6':
+    change_ipv6(old=True)
+elif reason == 'DEPREF6':
+    pass
 else:
     raise ArgumentError('Unknown reason ' + reason)
 for c in cmd_queue:
