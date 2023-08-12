@@ -71,6 +71,23 @@ def gen_pd_offset(base, displacement, required_mask):
         first_val = int(v6_network.network_address)
         return ipaddress.IPv6Address(first_val + displacement)
     raise ArgumentError(f'IPv6 prefix delegation size (e: {required_mask}, g: {mask}) not expected')
+def change_ipv6_pd(old=False, new=False):
+    if old and 'old_ip6_prefix' in os.environ:
+        old_v6 = str(os.environ['old_ip6_prefix']).split(' ')[0]
+        # if_1 = gen_pd_offset(old_v6, 0x300000000000001, 60)
+        # if_2 = gen_pd_offset(old_v6, 0x10300000000000001, 60)
+        # if_3 = gen_pd_offset(old_v6, 0x20300000000000000, 60)
+        # run_cmd('ip addr del "$1/64" dev lower_eth1 || :', [str(if_1)])
+        # run_cmd('ip addr del "$1/64" dev lower_eth2 || :', [str(if_2)])
+        # run_cmd('ip6tables -t nat -D POSTROUTING -s "2001:db8:1000::/40" -o eth0 -j NETMAP --to "$1/72" || :', [str(if_3)])
+    if new and 'new_ip6_prefix' in os.environ:
+        new_v6 = str(os.environ['new_ip6_prefix']).split(' ')[0]
+        # if_1 = gen_pd_offset(new_v6, 0x300000000000001, 60)
+        # if_2 = gen_pd_offset(new_v6, 0x10300000000000001, 60)
+        # if_3 = gen_pd_offset(new_v6, 0x20300000000000000, 60)
+        # run_cmd('ip addr add "$1/64" dev lower_eth1 || :', [str(if_1)])
+        # run_cmd('ip addr add "$1/64" dev lower_eth2 || :', [str(if_2)])
+        # run_cmd('ip6tables -t nat -I POSTROUTING -s "2001:db8:1000::/40" -o eth0 -j NETMAP --to "$1/72" || :', [str(if_3)])
 def set_dns():
     if 'new_domain_name_servers' in os.environ:
         safe_v4 = get_safe_ipv4(str(os.environ['new_domain_name_servers']).split(' ')[0])
@@ -107,18 +124,26 @@ elif reason == 'REBIND':
     set_dns()
 elif reason == 'BOUND6':
     change_ipv6(new=True)
+    change_ipv6_pd(new=True)
 elif reason == 'RENEW6':
+    change_ipv6_pd(old=True)
     change_ipv6(old=True)
     change_ipv6(new=True)
+    change_ipv6_pd(new=True)
 elif reason == 'REBIND6':
+    change_ipv6_pd(old=True)
     change_ipv6(old=True)
     run_cmd('ip -6 neigh flush dev "$interface"', [])
     change_ipv6(new=True)
+    change_ipv6_pd(new=True)
 elif reason == 'EXPIRE6':
+    change_ipv6_pd(old=True)
     change_ipv6(old=True)
 elif reason == 'RELEASE6':
+    change_ipv6_pd(old=True)
     change_ipv6(old=True)
 elif reason == 'STOP6':
+    change_ipv6_pd(old=True)
     change_ipv6(old=True)
 elif reason == 'DEPREF6':
     pass
