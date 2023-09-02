@@ -50,7 +50,7 @@ def handle_config_inner(args):
     tproxy_subnets = extra_tproxy + [ipaddress.IPv6Network(get_ip_offset(config['base1'], 0x2_0000_0000_0000_0000) + '/64')]
     subprocess.run(['nsenter', '--net=' + netns, dir_res + '/ctrtool-containers/misc/netns-tool', 'local_if=to_urelay', 'netns=' + netns + '-s',
     'routes_local=' + ' '.join(str(s) for s in tproxy_subnets),
-    'address=' + ' '.join([get_ip_offset(config['base1'], 10)] + ([get_ipv4_offset(config['base1_v4'], 2)] if 'base1_v4' in config else [])),
+    'address=' + ' '.join(['192.0.0.8', get_ip_offset(config['base1'], 10)] + ([get_ipv4_offset(config['base1_v4'], 2)] if 'base1_v4' in config else [])),
     'local_addr=0.0.0.10', 'mode=l3_system'], check=True)
     for s in tproxy_subnets:
         if isinstance(s, ipaddress.IPv4Network):
