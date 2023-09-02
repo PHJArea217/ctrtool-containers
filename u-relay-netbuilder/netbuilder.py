@@ -52,6 +52,7 @@ def handle_config_inner(args):
     'routes_local=' + ' '.join(str(s) for s in tproxy_subnets),
     'address=' + ' '.join(['192.0.0.8', get_ip_offset(config['base1'], 10)] + ([get_ipv4_offset(config['base1_v4'], 2)] if 'base1_v4' in config else [])),
     'local_addr=0.0.0.10', 'mode=l3_system'], check=True)
+    subprocess.run(['nsenter', '--net=' + netns + '-s', 'sysctl', '-w', 'net.ipv4.ip_nonlocal_bind=1', 'net.ipv6.ip_nonlocal_bind=1'])
     for s in tproxy_subnets:
         if isinstance(s, ipaddress.IPv4Network):
             subprocess.run(['nsenter', '--net=' + netns + '-s', 'iptables', '-t', 'mangle', '-A', 'PREROUTING', '-p', 'tcp', '-d', str(s), '-j', 'TPROXY', '--on-ip', '127.0.0.20', '--on-port', '1'], check=True)
