@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import ipaddress, argparse, shlex, os, sys, subprocess
+import ipaddress, argparse, shlex, os, sys, subprocess, time
 dir_res = os.path.dirname(__file__) + '/netbuilder-resources'
 config = {'eif': 'vif', 'eif_num': 0}
 def handle_set(args):
@@ -116,5 +116,4 @@ with open(av.conf, 'r') as conf:
                 handle_daemon_powerdns(ss[1:])
             else:
                 raise Exception(f"""unrecognized command {ss[0]} in {av.conf}""")
-
-
+time.sleep(1)
