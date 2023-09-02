@@ -2,4 +2,4 @@ set --base1 fd26:4cc:bcc7:4d00::/56
 c-inner --extra-wg-args wg_conf=/dev/null
 d-dnsmasq-inner dnsmasq-test.conf
 d-urelay netbuilder-resources/universal-relay/example_new.js
-d-powerdns --conf-dir=test-powerdns
+d-powerdns -- --conf-dir=test-powerdns
