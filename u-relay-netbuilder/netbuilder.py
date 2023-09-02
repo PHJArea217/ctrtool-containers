@@ -77,8 +77,19 @@ def handle_daemon_urelay(args):
                     '-ni0,n', '-6::ffff:127.0.0.20,1,at', '-l4096',
                     '-ni0,n', '-tdgram', f'''-6{get_ip_offset(config['base1'], 10)},123,af''',
                     'setpriv', '--reuid=' + a.uid, '--regid=' + a.gid, '--init-groups',
+                    'env', 'NETBUILDER_IPV6_PREFIX_BASE=' + ((int(config['base1'].network_address) >> 64) + 2),
                     'node'] + a.extra_args)
 
+def handle_daemon_powerdns(args):
+    ag = argparse.ArgumentParser()
+    ag.add_argument('--netns', default='inner-1-s')
+    ag.add_argument('extra_args', nargs='*', default=[])
+    ag.add_argument('--gid', default='u-relay-pdns')
+    ag.add_argument('--uid', default='u-relay-pdns')
+    a = ag.parse_args(args)
+    netns = a.netns if '/' in a.netns else ('/run/netns/' + a.netns)
+    subprocess.Popen(['nsenter', '--net=' + netns, 'pdns_server', '--setuid=' + a.uid, '--setgid=' + a.gid] + a.extra_args, check=True)
+    
 a = argparse.ArgumentParser()
 a.add_argument('conf')
 a.add_argument('-d', '--directory', default='')
