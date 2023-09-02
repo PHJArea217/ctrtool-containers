@@ -72,7 +72,7 @@ def handle_daemon_urelay(args):
     ag.add_argument('--uid', default='u-relay')
     a = ag.parse_args(args)
     netns = a.netns if '/' in a.netns else ('/run/netns/' + a.netns)
-    subprocess.run([dir_res + '/container-scripts/ctrtool/ctrtool', 'ns_open_file', '-mP', netns, '-s0,i',
+    subprocess.Popen([dir_res + '/container-scripts/ctrtool/ctrtool', 'ns_open_file', '-mP', netns, '-s0,i',
                     '-ni0,n', '-dinet', '-4127.0.0.10,81,a', '-l4096',
                     '-ni0,n', '-6::ffff:127.0.0.20,1,at', '-l4096',
                     '-ni0,n', '-tdgram', f'''-6{get_ip_offset(config['base1'], 10)},123,af''',
