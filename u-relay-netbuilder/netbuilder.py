@@ -54,21 +54,47 @@ def handle_config_inner(args):
     'local_addr=0.0.0.10', 'mode=l3_system'], check=True)
     for s in tproxy_subnets:
         if isinstance(s, ipaddress.IPv4Network):
-            subprocess.run(['nsenter', '--net=' + netns, 'iptables', '-t', 'mangle', '-A', 'PREROUTING', '-p', 'tcp', '-d', str(s), '-j', 'TPROXY', '--on-ip', '127.0.0.20', '--on-port', '1'], check=True)
+            subprocess.run(['nsenter', '--net=' + netns + '-s', 'iptables', '-t', 'mangle', '-A', 'PREROUTING', '-p', 'tcp', '-d', str(s), '-j', 'TPROXY', '--on-ip', '127.0.0.20', '--on-port', '1'], check=True)
         elif isinstance(s, ipaddress.IPv6Network):
-            subprocess.run(['nsenter', '--net=' + netns, 'ip6tables', '-t', 'mangle', '-A', 'PREROUTING', '-p', 'tcp', '-d', str(s), '-j', 'TPROXY', '--on-ip', '::ffff:127.0.0.20', '--on-port', '1'], check=True)
-
+            subprocess.run(['nsenter', '--net=' + netns + '-s', 'ip6tables', '-t', 'mangle', '-A', 'PREROUTING', '-p', 'tcp', '-d', str(s), '-j', 'TPROXY', '--on-ip', '::ffff:127.0.0.20', '--on-port', '1'], check=True)
+def handle_daemon_dnsmasq_inner(args):
+    ag = argparse.ArgumentParser()
+    ag.add_argument('--netns', default='inner-1')
+    ag.add_argument('conf')
+    a = ag.parse_args(args)
+    netns = a.netns if '/' in a.netns else ('/run/netns/' + a.netns)
+    subprocess.run(['nsenter', '--net=' + netns, 'dnsmasq', '--server=' + get_ip_offset(config['base1'], 10), '-C', a.conf], check=True)
+def handle_daemon_urelay(args):
+    ag = argparse.ArgumentParser()
+    ag.add_argument('--netns', default='inner-1-s')
+    ag.add_argument('extra_args', nargs='*', default=[])
+    ag.add_argument('gid', default='u-relay')
+    ag.add_argument('uid', default='u-relay')
+    a = ag.parse_args(args)
+    netns = a.netns if '/' in a.netns else ('/run/netns/' + a.netns)
+    subprocess.run([dir_res + '/container-scripts/ctrtool/ctrtool', 'ns_open_file', '-mP', netns, '-s0,i',
+                    '-ni0,n', '-dinet', '-4127.0.0.10,81,a', '-l4096',
+                    '-ni0,n', '-6::ffff:127.0.0.20,1,at', '-l4096',
+                    '-ni0,n', '-tdgram', f'''-6{get_ip_offset(config['base1'], 10)},123,af''',
+                    'setpriv', '--reuid=' + a.uid, '--regid=' + a.gid, '--init-groups',
+                    'node'] + a.extra_args)
 
 a = argparse.ArgumentParser()
 a.add_argument('conf')
 av = a.parse_args()
+conf_dirname = os.path.dirname(av.conf)
 with open(av.conf, 'r') as conf:
+    os.chdir(conf_dirname)
     for l in conf.readlines():
         ss = shlex.split(l, comments=True)
         if (len(ss) > 0) and ss[0]:
             if ss[0] == 'set':
-                handle_set(ss)
+                handle_set(ss[1:])
             elif ss[0] == 'c-inner':
-                handle_config_inner(ss)
+                handle_config_inner(ss[1:])
+            elif ss[0] == 'd-dnsmasq-inner':
+                handle_daemon_dnsmasq_inner(ss[1:])
+            elif ss[0] == 'd-urelay':
+                handle_daemon_urelay(ss[1:])
 
 
