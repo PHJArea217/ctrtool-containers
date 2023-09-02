@@ -81,8 +81,9 @@ def handle_daemon_urelay(args):
 
 a = argparse.ArgumentParser()
 a.add_argument('conf')
+a.add_argument('-d', '--directory', default='')
 av = a.parse_args()
-conf_dirname = os.path.dirname(av.conf)
+conf_dirname = a.directory if a.directory else os.path.dirname(av.conf)
 with open(av.conf, 'r') as conf:
     os.chdir(conf_dirname)
     for l in conf.readlines():
@@ -96,5 +97,9 @@ with open(av.conf, 'r') as conf:
                 handle_daemon_dnsmasq_inner(ss[1:])
             elif ss[0] == 'd-urelay':
                 handle_daemon_urelay(ss[1:])
+            elif ss[0] in ['cmd', 'c-cmd', 'd-cmd']:
+                subprocess.run(ss[1:], check=True)
+            else:
+                raise Exception(f"""unrecognized command {ss[0]} in {av.conf}""")
 
 
