@@ -96,7 +96,7 @@ a = argparse.ArgumentParser()
 a.add_argument('conf')
 a.add_argument('-d', '--directory', default='')
 av = a.parse_args()
-conf_dirname = a.directory if a.directory else os.path.dirname(av.conf)
+conf_dirname = av.directory if av.directory else os.path.dirname(av.conf)
 with open(av.conf, 'r') as conf:
     os.chdir(conf_dirname)
     for l in conf.readlines():
