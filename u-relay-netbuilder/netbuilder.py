@@ -68,8 +68,8 @@ def handle_daemon_urelay(args):
     ag = argparse.ArgumentParser()
     ag.add_argument('--netns', default='inner-1-s')
     ag.add_argument('extra_args', nargs='*', default=[])
-    ag.add_argument('gid', default='u-relay')
-    ag.add_argument('uid', default='u-relay')
+    ag.add_argument('--gid', default='u-relay')
+    ag.add_argument('--uid', default='u-relay')
     a = ag.parse_args(args)
     netns = a.netns if '/' in a.netns else ('/run/netns/' + a.netns)
     subprocess.run([dir_res + '/container-scripts/ctrtool/ctrtool', 'ns_open_file', '-mP', netns, '-s0,i',
