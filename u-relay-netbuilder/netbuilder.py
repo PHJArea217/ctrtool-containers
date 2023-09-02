@@ -77,7 +77,7 @@ def handle_daemon_urelay(args):
                     '-ni0,n', '-6::ffff:127.0.0.20,1,at', '-l4096',
                     '-ni0,n', '-tdgram', f'''-6{get_ip_offset(config['base1'], 10)},123,af''',
                     'setpriv', '--reuid=' + a.uid, '--regid=' + a.gid, '--init-groups',
-                    'env', 'NETBUILDER_IPV6_PREFIX_BASE=' + ((int(config['base1'].network_address) >> 64) + 2),
+                    'env', 'NETBUILDER_IPV6_PREFIX_BASE=' + ((int(config['base1'].network_address) >> 64) + 2), 'NODE_ENV=production',
                     'node'] + a.extra_args)
 
 def handle_daemon_powerdns(args):
@@ -88,8 +88,10 @@ def handle_daemon_powerdns(args):
     ag.add_argument('--uid', default='u-relay-pdns')
     a = ag.parse_args(args)
     netns = a.netns if '/' in a.netns else ('/run/netns/' + a.netns)
-    subprocess.Popen(['nsenter', '--net=' + netns, 'pdns_server', '--setuid=' + a.uid, '--setgid=' + a.gid] + a.extra_args, check=True)
-    
+    b = ['[' + get_ip_offset(config['base1'], 10) + ']']
+    if 'base1_v4' in config:
+        b.append(get_ipv4_offset(config['base1_v4'], 2))
+    subprocess.Popen(['nsenter', '--net=' + netns, 'pdns_server', '--setuid=' + a.uid, '--setgid=' + a.gid, '--local-address=' + ','.join(b), '--local-address-nonexist-fail=false'] + a.extra_args, check=True)
 a = argparse.ArgumentParser()
 a.add_argument('conf')
 a.add_argument('-d', '--directory', default='')
@@ -110,6 +112,8 @@ with open(av.conf, 'r') as conf:
                 handle_daemon_urelay(ss[1:])
             elif ss[0] in ['cmd', 'c-cmd', 'd-cmd']:
                 subprocess.run(ss[1:], check=True)
+            elif ss[0] == 'd-powerdns':
+                handle_daemon_powerdns(ss[1:])
             else:
                 raise Exception(f"""unrecognized command {ss[0]} in {av.conf}""")
 
