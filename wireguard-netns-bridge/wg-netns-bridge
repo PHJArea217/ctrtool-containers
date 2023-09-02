@@ -103,7 +103,9 @@ esac
 ip link add "$wg_if" type wireguard
 trap 'ip link del "$wg_if"' EXIT
 wg setconf "$wg_if" "$wg_conf"
-wg set "$wg_if" private-key "$wg_privkey"
+if [ -n "$wg_privkey" ]; then
+	wg set "$wg_if" private-key "$wg_privkey"
+fi
 trap 'false' EXIT
 unshare -n sh -c 'set -eu
 trap "nsenter --net=/proc/self/fd/3 ip link del "\"\$1\" EXIT
